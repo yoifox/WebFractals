@@ -51,12 +51,13 @@ export class Fractal {
 }
 
 export class MandelboxFractal extends Fractal {
+	scale = 2.8;
 	getDistanceFunction = () => {
 		let glsl = `
 		vec4 orbitTrap = vec4(MAX_DIST);
 		float distanceFunction(vec3 pos, bool isLight, int reflectionIndex) {
 			if(!isLight) orbitTrap = vec4(MAX_DIST);
-			float scale = 2.8;
+			float scale = #SCALE;
 			float MR2 = 0.2;
 			vec4 scalevec = vec4(scale, scale, scale, abs(scale)) / MR2;
 			float C1 = abs(scale - 1.0), C2 = pow(abs(scale), float(1 - #ITERATIONS));
@@ -75,18 +76,21 @@ export class MandelboxFractal extends Fractal {
 		`;
 		glsl = glsl.replace(/#ITERATIONS/g, this.iterations);
 		glsl = glsl.replace(/#COLOR_ITERATIONS/g, this.colorIterations);
+		glsl = glsl.replace(/#SCALE/g, this.scale.toFixed(8));
 		return glsl;
 	}
 }
 
 export class SphereSpongeFractal extends Fractal {
+	scale = 2.0;
+	spongeScale = 2.05;
 	getDistanceFunction = () => {
 		let glsl = `
 		vec4 orbitTrap = vec4(MAX_DIST);
 		float distanceFunction(vec3 position, bool isLight, int reflectionIndex) {
 			if(!isLight) orbitTrap = vec4(MAX_DIST);
-			float scale = 2.0;
-			float spongeScale = 2.05;
+			float scale = #SCALE;
+			float spongeScale = #SPONGE_SCALE;
 			float k = scale;
 			float d = -MAX_DIST, md = MAX_DIST;
 			float d1, r;
@@ -107,6 +111,8 @@ export class SphereSpongeFractal extends Fractal {
 		`;
 		glsl = glsl.replace(/#ITERATIONS/g, this.iterations);
 		glsl = glsl.replace(/#COLOR_ITERATIONS/g, this.colorIterations);
+		glsl = glsl.replace(/#SCALE/g, this.scale.toFixed(8));
+		glsl = glsl.replace(/#SPONGE_SCALE/g, this.spongeScale.toFixed(8));
 		return glsl;
 	}
 }
@@ -149,6 +155,92 @@ export class MandelbulbFractal extends Fractal {
 	}
 }
 
+export class SierpinskiPyramidFractal extends Fractal {
+	scale = 2.0;
+	offset = 2.0;
+	getDistanceFunction = () => {
+		let glsl = `
+		vec4 orbitTrap = vec4(MAX_DIST);
+		float distanceFunction(vec3 position, bool isLight, int reflectionIndex) {
+			const float scale = #SCALE;
+			const float offset = #OFFSET;
+
+			for(int i = 0; i < #ITERATIONS; i++) {
+				position.xy = (position.x + position.y < 0.0) ? -position.yx : position.xy;
+				position.xz = (position.x + position.z < 0.0) ? -position.zx : position.xz;
+				position.zy = (position.z + position.y < 0.0) ? -position.yz : position.zy;
+				position = scale * position - offset * (scale - 1.0);
+				if(isLight && i < #COLOR_ITERATIONS) {
+					orbitTrap = min(orbitTrap, abs(vec4(position.x, position.y, position.z, scale * offset)));
+				}
+			}
+		 
+			return length(position) * pow(scale, -float(#ITERATIONS));
+		}
+		`;
+		glsl = glsl.replace(/#ITERATIONS/g, this.iterations);
+		glsl = glsl.replace(/#COLOR_ITERATIONS/g, this.colorIterations);
+		glsl = glsl.replace(/#SCALE/g, this.scale.toFixed(8));
+		glsl = glsl.replace(/#OFFSET/g, this.offset.toFixed(8));
+		return glsl;
+	}
+}
+
+export class MengerSpongeFractal extends Fractal {
+	scale = 1;
+	offset = 1;
+	getDistanceFunction = () => {
+		let glsl = `
+		float maxcomp(vec3 p) {
+			float m1 = max(p.x, p.y);
+			return max(m1, p.z);
+		}
+
+		vec2 objBoxS(vec3 p, vec3 b) {
+			vec3  di = abs(p) - b;
+			float mc = maxcomp(di);
+			float d = min(mc, length(max(di, 0.0)));
+			return vec2(d, 1);
+		}
+
+		vec2 objBox(vec3 p) {
+			vec3 b = vec3(4.0);
+			return objBoxS(p, b);
+		}
+
+		vec2 objCross(in vec3 p) {
+			vec2 da = objBoxS(p.xyz, vec3(MAX_DIST, 2.0, 2.0));
+			vec2 db = objBoxS(p.yzx, vec3(2.0, MAX_DIST, 2.0));
+			vec2 dc = objBoxS(p.zxy, vec3(2.0, 2.0, MAX_DIST));
+			return vec2(min(da.x, min(db.x, dc.x)), 1);
+		}
+
+		vec4 orbitTrap = vec4(MAX_DIST);
+		float distanceFunction(vec3 position, bool isLight, int reflectionIndex) {
+			vec2 d2 = objBox(position);
+			float scale = #SCALE;
+			float offset = #OFFSET;
+			for(int i = 0; i < #ITERATIONS; i++) {
+				vec3 a = mod(position * scale, 2.0) - offset;
+				scale *= 3.0;
+				vec3 r = 1.0 - 4.0 * abs(a);
+				vec2 c = objCross(r) / scale;
+				d2.x = max(d2.x, c.x);
+				if(isLight && i < #COLOR_ITERATIONS) {
+					orbitTrap = min(orbitTrap, abs(vec4(a.x, a.y, a.z, scale * offset)));
+				}
+			} 
+			return d2.x;
+		}
+		`;
+		glsl = glsl.replace(/#ITERATIONS/g, this.iterations);
+		glsl = glsl.replace(/#COLOR_ITERATIONS/g, this.colorIterations);
+		glsl = glsl.replace(/#SCALE/g, this.scale.toFixed(8));
+		glsl = glsl.replace(/#OFFSET/g, this.offset.toFixed(8));
+		return glsl;
+	}
+}
+
 export class RayMarcher {
 	vertexShaderCode = `
 		precision highp float;
@@ -171,6 +263,7 @@ export class RayMarcher {
 		${TRANSFORMATIONS_GLSL}
 
 		#DISTANCE_FUNCTION
+		
 		float sceneDE(vec3 position, bool isLight, int reflectionIndex) {
 			#SPIN
 			return distanceFunction(position, isLight, reflectionIndex);
@@ -185,7 +278,7 @@ export class RayMarcher {
 				vec3 p = rayPos + rayDir * marchedDistance;
 				float distance = sceneDE(p, isLight, reflectionIndex);
 				if(#DYNAMIC_MIN_DIST && !isLight)
-					minDistance = marchedDistance * #MIN_DIST_FACTOR;
+					minDistance = marchedDistance * MIN_DIST;
 				marchedDistance += distance;
 				if(marchedDistance > MAX_DIST || distance < minDistance) {
 					lastDistance = distance;
@@ -259,7 +352,7 @@ export class RayMarcher {
 		
 	maxDistance = 1000.0;
 	maxSteps = 256;
-	minDistance = 0.01;
+	minDistance = 0.001;
 	fov = 1.0;
 	skyColorFunction = 'vec3(0, 0, 1)';
 	colorFunction = 'vec3(diffuse)';
@@ -269,7 +362,6 @@ export class RayMarcher {
 	reflections = 0;
 	extra = '';
 	spin = false;
-	minDistanceFactor = 0.001;
 	dynamicMinDistance = true;
 	calcNormal = false;
 	shadowStrength = 0.9;
@@ -372,8 +464,6 @@ export class RayMarcher {
 		if(this.moving) {
 			this.canvas.width = this.canvasStartDimention.x / this.previewScale;
 			this.canvas.height = this.canvasStartDimention.y / this.previewScale;
-			this.canvas.style.width = this.canvasStartDimention.x;
-			this.canvas.style.height = this.canvasStartDimention.y;
 		}
 		if(this.mouseMoveEvent) this.cameraRotation = this.getNewRotation(this.cameraRotation, this.mouseMoveEvent, this.isMousePressed, this.lookSpeed * (window.innerWidth / this.canvasStartDimention.x));
 		if(!this.moving && !this.spin && this.pauseWhenNotMoving) return;
@@ -393,8 +483,6 @@ export class RayMarcher {
 		this.doEveryFrame();
 		this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
 		this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
-		this.canvas.style.width = this.canvasStartDimention.x;
-		this.canvas.style.height = this.canvasStartDimention.y;
 	}
 	
 	compile = (canvas, distanceFunction) => {
@@ -410,7 +498,6 @@ export class RayMarcher {
 		this.fragmentShaderCode = this.fragmentShaderCode.replace(/#REFLECTNESS/g, this.reflectness.toFixed(8));
 		this.fragmentShaderCode = this.fragmentShaderCode.replace(/#REFLECTIONS/g, this.reflections);
 		this.fragmentShaderCode = this.fragmentShaderCode.replace(/#EXTRA/g, this.extra);
-		this.fragmentShaderCode = this.fragmentShaderCode.replace(/#MIN_DIST_FACTOR/g, this.minDistanceFactor.toFixed(8));
 		this.fragmentShaderCode = this.fragmentShaderCode.replace(/#DYNAMIC_MIN_DIST/g, this.dynamicMinDistance);
 		this.fragmentShaderCode = this.fragmentShaderCode.replace(/#CALC_NORMAL/g, this.calcNormal);
 		this.fragmentShaderCode = this.fragmentShaderCode.replace(/#SPIN/g, 
@@ -493,5 +580,7 @@ export class RayMarcher {
 		}
 		
 		if(this.frameIntervalMS == -1) this.update(0);
+		canvas.style.width = this.canvasStartDimention.x;
+		canvas.style.height = this.canvasStartDimention.y;
 	}
 }

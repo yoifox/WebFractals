@@ -1,5 +1,12 @@
 <script type="module">
 	import * as RM from './rm.js';
+	let sky = `
+		vec3 skyColor(vec2 uv, int reflection, vec3 rayDir) {
+		uv.y += 0.25;
+		float y = reflection == 0 ? (-uv.y + uRotation.x - length(uv - vec2(0.0, -1.0)) / 4.0) : (-rayDir.y - length(uv) / 4.0);
+		return exp2(y / vec3(0.1, 0.3, 0.6)) - vec3(0, 0.4, 0.4);
+	}
+	`;
 	window.init = () => {
 		let mandelbox = new RM.RayMarcher();
 		mandelbox.spin = true;
@@ -7,6 +14,8 @@
 		mandelbox.cameraPosition = {x: -10, y: 7, z: -10};
 		mandelbox.cameraRotation = {x: 30, y: 45, z: 0};
 		mandelbox.colorFunction = RM.Fractal.DEFAULT_FRACTAL_COLOR + '- 0.2';;
+		mandelbox.extra = sky;
+		mandelbox.skyColorFunction = 'skyColor(uv, reflection, rayDir)';
 		mandelbox.compile(document.getElementById('mandelbox'), new RM.MandelboxFractal().getDistanceFunction());
 		
 		let sphereSponge = new RM.RayMarcher();
@@ -14,23 +23,54 @@
 		sphereSponge.cameraPosition = {x: -1, y: 1, z: 0};
 		sphereSponge.fov = 0.5;
 		sphereSponge.colorFunction = RM.Fractal.DEFAULT_FRACTAL_COLOR + '+ 0.2';
-		sphereSponge.compile(document.getElementById('sphereSponge'), new RM.SphereSpongeFractal().getDistanceFunction());
-		sphereSponge.doEveryFrame = () => sphereSponge.cameraPosition.z += 0.01;
+		let sphereSpongeFractal = new RM.SphereSpongeFractal();
+		sphereSpongeFractal.extra = sky;
+		sphereSpongeFractal.skyColorFunction = 'skyColor(uv, reflection, rayDir)';
+		sphereSponge.compile(document.getElementById('sphereSponge'), sphereSpongeFractal.getDistanceFunction());
+		sphereSponge.doEveryFrame = () => sphereSponge.cameraPosition.z += 0.005;
 
 		let mandelbulb = new RM.RayMarcher();
 		mandelbulb.lightFunction = 'vec3(uPosition - 0.2)';
 		mandelbulb.spin = true;
 		mandelbulb.cameraPosition = {x: 0, y: 0, z: -3.5};
-		mandelbulb.colorFunction = RM.Fractal.DEFAULT_FRACTAL_COLOR + '- 0.2';;
+		mandelbulb.colorFunction = RM.Fractal.DEFAULT_FRACTAL_COLOR + '- 0.2';
+		mandelbulb.extra = sky;
+		mandelbulb.skyColorFunction = 'skyColor(uv, reflection, rayDir)';
 		mandelbulb.compile(document.getElementById('mandelbulb'), new RM.MandelbulbFractal().getDistanceFunction());
+	
+		let sierpinski = new RM.RayMarcher();
+		sierpinski.lightFunction = 'vec3(uPosition - 0.2)';
+		sierpinski.spin = true;
+		sierpinski.cameraPosition = {x: 0, y: 0, z: -6.5};
+		sierpinski.colorFunction = 'vec3(0) + diffuse';
+		sierpinski.extra = sky;
+		sierpinski.skyColorFunction = 'skyColor(uv, reflection, rayDir)';
+		sierpinski.minDistance = 0.01;
+		sierpinski.compile(document.getElementById('sierpinski'), new RM.SierpinskiPyramidFractal().getDistanceFunction());
+	
+		let mengerSponge = new RM.RayMarcher();
+		mengerSponge.lightFunction = 'vec3(uPosition - 0.2)';
+		mengerSponge.spin = true;
+		mengerSponge.cameraPosition = {x: -10, y: 7, z: -10};
+		mengerSponge.cameraRotation = {x: 30, y: 45, z: 0};
+		mengerSponge.colorFunction = 'vec3(0) + diffuse';
+		mengerSponge.extra = sky;
+		mengerSponge.skyColorFunction = 'skyColor(uv, reflection, rayDir)';
+		let mengerSpongeFractal = new RM.MengerSpongeFractal();
+		mengerSponge.compile(document.getElementById('mengerSponge'), mengerSpongeFractal.getDistanceFunction());
 	
 		mandelbox.pauseWhenNotMoving = false;
 		sphereSponge.pauseWhenNotMoving = false;
 		mandelbulb.pauseWhenNotMoving = false;
+		sierpinski.pauseWhenNotMoving = false;
+		mengerSponge.pauseWhenNotMoving = false;
 		
-		mandelbox.previewScale = 1;
-		sphereSponge.previewScale = 1;
-		mandelbulb.previewScale = 1;
+		mandelbox.previewScale = 2;
+		sphereSponge.previewScale = 2;
+		mandelbulb.previewScale = 2;
+		sierpinski.previewScale = 2;
+		mengerSponge.previewScale = 2;
+		mengerSponge.previewScale = 2;
 	}
 </script>
 
@@ -38,4 +78,6 @@
 	<canvas id="mandelbox" width="500" height="500"></canvas>
 	<canvas id="sphereSponge" width="500" height="500"></canvas>
 	<canvas id="mandelbulb" width="500" height="500"></canvas>
+	<canvas id="sierpinski" width="500" height="500"></canvas>
+	<canvas id="mengerSponge" width="500" height="500"></canvas>
 </body>
