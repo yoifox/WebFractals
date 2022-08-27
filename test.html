@@ -1,0 +1,41 @@
+<script type="module">
+	import * as RM from './rm.js';
+	window.init = () => {
+		let mandelbox = new RM.RayMarcher();
+		mandelbox.spin = true;
+		mandelbox.lightFunction = 'vec3(uPosition - 0.2)';
+		mandelbox.cameraPosition = {x: -10, y: 7, z: -10};
+		mandelbox.cameraRotation = {x: 30, y: 45, z: 0};
+		mandelbox.colorFunction = RM.Fractal.DEFAULT_FRACTAL_COLOR + '- 0.2';;
+		mandelbox.compile(document.getElementById('mandelbox'), new RM.MandelboxFractal().getDistanceFunction());
+		
+		let sphereSponge = new RM.RayMarcher();
+		sphereSponge.lightFunction = 'vec3(uPosition - 0.2)';
+		sphereSponge.cameraPosition = {x: -1, y: 1, z: 0};
+		sphereSponge.fov = 0.5;
+		sphereSponge.colorFunction = RM.Fractal.DEFAULT_FRACTAL_COLOR + '+ 0.2';
+		sphereSponge.compile(document.getElementById('sphereSponge'), new RM.SphereSpongeFractal().getDistanceFunction());
+		sphereSponge.doEveryFrame = () => sphereSponge.cameraPosition.z += 0.01;
+
+		let mandelbulb = new RM.RayMarcher();
+		mandelbulb.lightFunction = 'vec3(uPosition - 0.2)';
+		mandelbulb.spin = true;
+		mandelbulb.cameraPosition = {x: 0, y: 0, z: -3.5};
+		mandelbulb.colorFunction = RM.Fractal.DEFAULT_FRACTAL_COLOR + '- 0.2';;
+		mandelbulb.compile(document.getElementById('mandelbulb'), new RM.MandelbulbFractal().getDistanceFunction());
+	
+		mandelbox.pauseWhenNotMoving = false;
+		sphereSponge.pauseWhenNotMoving = false;
+		mandelbulb.pauseWhenNotMoving = false;
+		
+		mandelbox.previewScale = 1;
+		sphereSponge.previewScale = 1;
+		mandelbulb.previewScale = 1;
+	}
+</script>
+
+<body onload="init()">
+	<canvas id="mandelbox" width="500" height="500"></canvas>
+	<canvas id="sphereSponge" width="500" height="500"></canvas>
+	<canvas id="mandelbulb" width="500" height="500"></canvas>
+</body>
